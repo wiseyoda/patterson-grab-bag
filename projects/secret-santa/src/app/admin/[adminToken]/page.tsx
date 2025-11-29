@@ -25,6 +25,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Copy,
+  Check,
+  Mail,
+  MessageCircle,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 
 interface Participant {
   id: string;
@@ -85,6 +93,7 @@ export default function AdminPage() {
   const [adminEmailSending, setAdminEmailSending] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [copiedParticipantId, setCopiedParticipantId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   // Delete event modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -105,7 +114,7 @@ export default function AdminPage() {
     open: false,
     title: "",
     message: "",
-    action: async () => {},
+    action: async () => { },
     actionLabel: "",
     variant: "default",
     requireDoubleConfirm: false,
@@ -150,18 +159,50 @@ export default function AdminPage() {
     const gmailConnectedParam = searchParams.get("gmail_connected");
     const gmailError = searchParams.get("gmail_error");
 
-    if (gmailConnectedParam === "true") {
-      setSuccessMessage("Gmail connected successfully!");
-      setGmailConnected(true);
-      // Clean up URL params
+    async function handleGmailConnected() {
+      // Clean up URL params first
       router.replace(`/admin/${adminToken}`, { scroll: false });
+
+      // Fetch the Gmail status to get the connected email address
+      try {
+        const response = await fetch(`/api/admin/${adminToken}/gmail/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setGmailConnected(data.connected && !data.expired);
+
+          // Automatically send admin link email to the connected Gmail
+          if (data.email) {
+            const emailResponse = await fetch(`/api/admin/${adminToken}/email-link`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: data.email }),
+            });
+
+            if (emailResponse.ok) {
+              setSuccessMessage(`Gmail connected! Admin link sent to ${data.email}`);
+            } else {
+              setSuccessMessage("Gmail connected successfully!");
+            }
+          } else {
+            setSuccessMessage("Gmail connected successfully!");
+          }
+        } else {
+          setSuccessMessage("Gmail connected successfully!");
+        }
+      } catch {
+        setSuccessMessage("Gmail connected successfully!");
+      }
+    }
+
+    if (gmailConnectedParam === "true") {
+      handleGmailConnected();
     } else if (gmailError) {
       setError(gmailError);
       // Clean up URL params
       router.replace(`/admin/${adminToken}`, { scroll: false });
     }
 
-    // Fetch Gmail status
+    // Fetch Gmail status on initial load
     async function fetchGmailStatus() {
       try {
         const response = await fetch(`/api/admin/${adminToken}/gmail/status`);
@@ -173,7 +214,9 @@ export default function AdminPage() {
         // Silently fail - user can still try to connect
       }
     }
-    fetchGmailStatus();
+    if (!gmailConnectedParam) {
+      fetchGmailStatus();
+    }
   }, [searchParams, adminToken, router]);
 
   async function addParticipant(e: React.FormEvent) {
@@ -309,7 +352,7 @@ export default function AdminPage() {
             </div>
           ),
           "OK",
-          async () => {},
+          async () => { },
           "default",
           false
         );
@@ -522,6 +565,35 @@ export default function AdminPage() {
     } else {
       // Only use alert as fallback if copy truly failed
       prompt("Copy this link:", url);
+    }
+  }
+
+  async function copyIMessage(participant: Participant) {
+    const url = `${window.location.origin}/reveal/${participant.accessToken}`;
+    const eventName = event?.name || "Secret Santa";
+    const budgetText = event?.budget
+      ? ` (budget: ${event.budget.startsWith("$") ? "" : "$"}${event.budget})`
+      : "";
+    const dateText = event?.eventDate
+      ? ` on ${new Date(event.eventDate + "T12:00:00").toLocaleDateString()}`
+      : "";
+
+    const message = `Hey ${participant.name}! 🎁
+
+You've been recruited for ${eventName}${dateText}! Your mission, should you choose to accept it (and you really should): buy an awesome gift for someone special${budgetText}.
+
+This message will NOT self-destruct. Happy gifting! 🎄
+
+Tap the link below to discover your target... I mean, your lucky giftee:
+
+${url}`;
+
+    const success = await copyToClipboard(message);
+    if (success) {
+      setCopiedMessageId(participant.id);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } else {
+      prompt("Copy this message:", message);
     }
   }
 
@@ -966,35 +1038,72 @@ export default function AdminPage() {
                     </TableCell>
                     <TableCell>{getStatusBadge(participant.notificationStatus)}</TableCell>
                     <TableCell>
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex gap-1">
+                        {/* Copy Link Button */}
                         <Button
                           type="button"
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
                           onClick={() => copyLink(participant.accessToken, participant.id)}
+                          title="Copy reveal link"
                         >
-                          {copiedParticipantId === participant.id ? "Copied!" : "Copy Link"}
+                          {copiedParticipantId === participant.id ? (
+                            <Check className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
                         </Button>
+
+                        {/* Send Email Button - only when locked and has email */}
                         {event.isLocked && participant.email && (
                           <Button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => resendEmail(participant.id)}
-                            disabled={actionLoading === participant.id}
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 ${!gmailConnected ? "opacity-50 cursor-not-allowed" : ""}`}
+                            onClick={() => gmailConnected && resendEmail(participant.id)}
+                            disabled={actionLoading === participant.id || !gmailConnected}
+                            title={gmailConnected ? "Send email" : "Connect Gmail to send emails"}
                           >
-                            {actionLoading === participant.id ? "Sending..." : "Send Email"}
+                            {actionLoading === participant.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Mail className="h-4 w-4" />
+                            )}
                           </Button>
                         )}
+
+                        {/* Copy iMessage Button - always show when locked */}
+                        {event.isLocked && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => copyIMessage(participant)}
+                            title="Copy message for iMessage/SMS"
+                          >
+                            {copiedMessageId === participant.id ? (
+                              <Check className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <MessageCircle className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+
+                        {/* Remove Button - only when not locked */}
                         {!event.isLocked && (
                           <Button
                             type="button"
-                            variant="destructive"
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                             onClick={() => confirmRemoveParticipant(participant.id, participant.name)}
                             disabled={actionLoading === participant.id}
+                            title="Remove participant"
                           >
-                            Remove
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
