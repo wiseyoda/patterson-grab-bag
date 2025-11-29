@@ -166,7 +166,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       try {
         result = generatePartialAssignments(
           unlockedParticipants.map(p => p.id),
-          lockedAssignments
+          lockedAssignments,
+          lockedParticipants.map(p => p.id) // Pass locked giver IDs for proper receiver calculation
         );
 
         logInfo("Partial regeneration successful", {

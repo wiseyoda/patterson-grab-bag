@@ -2,6 +2,14 @@ function getOptionalEnvVar(key: string, defaultValue: string): string {
   return process.env[key] || defaultValue;
 }
 
+function getRequiredEnvVar(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+  return value;
+}
+
 function getDatabaseUrl(): string {
   return (
     process.env.PRISMA_DATABASE_URL ||
@@ -37,6 +45,15 @@ export const serverEnv = {
   get DIRECT_URL() {
     return getDirectUrl();
   },
+  get GOOGLE_CLIENT_ID() {
+    return getRequiredEnvVar("GOOGLE_CLIENT_ID");
+  },
+  get GOOGLE_CLIENT_SECRET() {
+    return getRequiredEnvVar("GOOGLE_CLIENT_SECRET");
+  },
+  get GOOGLE_REDIRECT_URI() {
+    return getRequiredEnvVar("GOOGLE_REDIRECT_URI");
+  },
 } as const;
 
 /**
@@ -64,6 +81,20 @@ export function validateEnv(): void {
 
   if (!getDirectUrl()) {
     warnings.push("DIRECT_URL (or POSTGRES_URL_NON_POOLING/POSTGRES_PRISMA_URL_NON_POOLING) is recommended for Prisma migrations");
+  }
+
+  // Check Google OAuth env vars (required for Gmail integration)
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    warnings.push("GOOGLE_CLIENT_ID is required for Gmail integration");
+  }
+  if (!process.env.GOOGLE_CLIENT_SECRET) {
+    warnings.push("GOOGLE_CLIENT_SECRET is required for Gmail integration");
+  }
+  if (!process.env.GOOGLE_REDIRECT_URI) {
+    warnings.push("GOOGLE_REDIRECT_URI is required for Gmail integration");
+  }
+  if (!process.env.OAUTH_TOKEN_ENCRYPTION_KEY) {
+    warnings.push("OAUTH_TOKEN_ENCRYPTION_KEY is required for Gmail integration");
   }
 
   if (errors.length > 0) {

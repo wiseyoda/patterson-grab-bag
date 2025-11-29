@@ -6,6 +6,16 @@ interface RouteParams {
   params: Promise<{ adminToken: string }>;
 }
 
+/**
+ * Validate email format
+ * Uses a practical regex that catches most malformed emails
+ */
+function isValidEmail(email: string): boolean {
+  // RFC 5322 compliant-ish regex that's practical for real-world use
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+}
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { adminToken } = await params;
@@ -15,6 +25,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json(
         { error: "Participant name is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate email if provided
+    const trimmedEmail = email?.trim();
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
+      return NextResponse.json(
+        { error: "Invalid email address format" },
         { status: 400 }
       );
     }
@@ -38,7 +57,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       data: {
         eventId: event.id,
         name: name.trim(),
-        email: email?.trim() || null,
+        email: trimmedEmail || null,
       },
     });
 

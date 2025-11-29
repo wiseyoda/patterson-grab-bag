@@ -78,11 +78,13 @@ describe('generateDerangement', () => {
     // Starting from any item, following the chain should visit all items
     // and return to the start after exactly n steps
     const visited = new Set<string>();
-    let current = items[0];
+    let current: string = items[0]!;
 
     for (let i = 0; i < items.length; i++) {
       visited.add(current);
-      current = result.get(current)!;
+      const next = result.get(current);
+      if (!next) throw new Error(`Missing assignment for ${current}`);
+      current = next;
     }
 
     // After n steps, we should be back at start and have visited everyone
@@ -99,13 +101,16 @@ describe('generateAssignments', () => {
       'uuid-3',
     ];
 
-    const result = generateAssignments(participantIds);
+    const { assignments, attempts } = generateAssignments(participantIds);
+
+    // Check it succeeded
+    expect(attempts).toBeGreaterThanOrEqual(1);
 
     // Check no self-assignments
     for (const id of participantIds) {
-      expect(result.get(id)).not.toBe(id);
+      expect(assignments.get(id)).not.toBe(id);
     }
 
-    expect(result.size).toBe(3);
+    expect(assignments.size).toBe(3);
   });
 });

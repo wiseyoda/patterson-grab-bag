@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/db";
 import { encryptToken, decryptToken } from "@/lib/encryption";
+import { serverEnv } from "@/lib/env";
 import { logError, logInfo, logWarn } from "@/lib/logger";
+
+/** Refresh tokens this many milliseconds before expiry */
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Error thrown when Gmail access has been revoked
@@ -61,11 +65,10 @@ export async function getValidAccessToken(eventId: string): Promise<{
     );
   }
 
-  // Check if token expires within 5 minutes
+  // Check if token expires within buffer period
   const expiresIn = credential.tokenExpiresAt.getTime() - Date.now();
-  const FIVE_MINUTES = 5 * 60 * 1000;
 
-  if (expiresIn < FIVE_MINUTES) {
+  if (expiresIn < TOKEN_REFRESH_BUFFER_MS) {
     logInfo("Refreshing Gmail access token", { eventId });
     await refreshAccessToken(credential);
 
@@ -117,8 +120,8 @@ async function refreshAccessToken(credential: GmailCredential): Promise<void> {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      client_id: serverEnv.GOOGLE_CLIENT_ID,
+      client_secret: serverEnv.GOOGLE_CLIENT_SECRET,
       refresh_token: refreshToken,
       grant_type: "refresh_token",
     }),

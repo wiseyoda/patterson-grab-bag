@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { encryptToken, decryptToken } from "@/lib/encryption";
+import { serverEnv } from "@/lib/env";
 import { logError, logInfo } from "@/lib/logger";
 
 /**
@@ -86,12 +87,12 @@ export async function GET(request: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        client_id: serverEnv.GOOGLE_CLIENT_ID,
+        client_secret: serverEnv.GOOGLE_CLIENT_SECRET,
         code,
         code_verifier: codeVerifier,
         grant_type: "authorization_code",
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+        redirect_uri: serverEnv.GOOGLE_REDIRECT_URI,
       }),
     });
 

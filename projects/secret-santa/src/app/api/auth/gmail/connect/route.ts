@@ -5,7 +5,24 @@ import {
   generateSecureRandom,
   generateCodeChallenge,
 } from "@/lib/encryption";
-import { logError } from "@/lib/logger";
+import { serverEnv } from "@/lib/env";
+import { logError, logInfo } from "@/lib/logger";
+
+/** OAuth state expiry time in milliseconds */
+const OAUTH_STATE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Cleanup expired OAuth states (opportunistic - runs before creating new state)
+ * This prevents stale states from accumulating in the database
+ */
+async function cleanupExpiredOAuthStates(): Promise<number> {
+  const result = await prisma.oAuthState.deleteMany({
+    where: {
+      expiresAt: { lt: new Date() },
+    },
+  });
+  return result.count;
+}
 
 /**
  * POST /api/auth/gmail/connect
@@ -35,6 +52,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
+    // Opportunistically cleanup expired OAuth states to prevent accumulation
+    const cleanedUp = await cleanupExpiredOAuthStates();
+    if (cleanedUp > 0) {
+      logInfo("Cleaned up expired OAuth states", { count: cleanedUp });
+    }
+
     // Generate cryptographic state (CSRF protection)
     const state = generateSecureRandom(32);
 
@@ -54,14 +77,14 @@ export async function POST(request: NextRequest) {
         codeVerifier: encryptedVerifier.encrypted,
         verifierIV: encryptedVerifier.iv,
         verifierAuthTag: encryptedVerifier.authTag,
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+        expiresAt: new Date(Date.now() + OAUTH_STATE_EXPIRY_MS),
       },
     });
 
     // Build Google OAuth URL
     const params = new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+      client_id: serverEnv.GOOGLE_CLIENT_ID,
+      redirect_uri: serverEnv.GOOGLE_REDIRECT_URI,
       response_type: "code",
       scope: "https://www.googleapis.com/auth/gmail.send email",
       state,

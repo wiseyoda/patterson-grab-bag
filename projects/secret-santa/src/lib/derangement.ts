@@ -244,16 +244,104 @@ export function generateAssignments(
 }
 
 /**
+ * Generates a bipartite assignment (givers -> receivers where sets may differ)
+ * Uses Fisher-Yates shuffle to create a random bijection
+ */
+function generateBipartiteAssignment(
+  givers: string[],
+  receivers: string[]
+): Map<string, string> {
+  if (givers.length !== receivers.length) {
+    throw new Error(
+      `Giver/receiver count mismatch: ${givers.length} givers, ${receivers.length} receivers`
+    );
+  }
+
+  // Shuffle receivers to create random assignment
+  const shuffledReceivers = [...receivers];
+  for (let i = shuffledReceivers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledReceivers[i], shuffledReceivers[j]] = [shuffledReceivers[j]!, shuffledReceivers[i]!];
+  }
+
+  const assignments = new Map<string, string>();
+  for (let i = 0; i < givers.length; i++) {
+    assignments.set(givers[i]!, shuffledReceivers[i]!);
+  }
+
+  return assignments;
+}
+
+/**
+ * Validates bipartite assignments (givers -> receivers)
+ */
+function validateBipartiteAssignments(
+  givers: string[],
+  receivers: string[],
+  assignments: Map<string, string>
+): ValidationResult {
+  const errors: string[] = [];
+
+  // Check: All givers have an assignment
+  for (const giver of givers) {
+    if (!assignments.has(giver)) {
+      errors.push(`Missing assignment for giver: ${giver}`);
+    }
+  }
+
+  // Check: No self-assignments
+  for (const [giver, receiver] of assignments) {
+    if (giver === receiver) {
+      errors.push(`Self-assignment detected: ${giver}`);
+    }
+  }
+
+  // Check: Each receiver receives exactly once
+  const receiverCounts = new Map<string, number>();
+  for (const receiver of assignments.values()) {
+    receiverCounts.set(receiver, (receiverCounts.get(receiver) || 0) + 1);
+  }
+
+  for (const receiver of receivers) {
+    const count = receiverCounts.get(receiver) || 0;
+    if (count !== 1) {
+      errors.push(`Receiver ${receiver} receives ${count} gifts (should be 1)`);
+    }
+  }
+
+  // Check: All assignments target valid receivers
+  for (const [giver, receiver] of assignments) {
+    if (!receivers.includes(receiver)) {
+      errors.push(`Giver ${giver} assigned to invalid receiver ${receiver}`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
  * Generates partial assignments for a subset of participants
  * Used when some participants have already viewed their assignments (locked)
  *
+ * Key insight: When locked givers have fixed assignments, their targets (lockedReceivers)
+ * are already receiving and cannot receive again from unlocked givers.
+ *
+ * The unlocked givers must assign to:
+ * - Locked givers (they need someone to give to them since their original giver may be unlocked)
+ * - Unlocked participants who are NOT lockedReceivers
+ *
  * @param unlockedParticipantIds - IDs of participants who haven't viewed (can be reassigned)
  * @param lockedAssignments - Map of locked assignments (viewed participants -> their targets)
+ * @param lockedGiverIds - IDs of participants who have viewed (their outgoing is fixed)
  * @returns New assignments for unlocked participants only
  */
 export function generatePartialAssignments(
   unlockedParticipantIds: string[],
-  lockedAssignments: Map<string, string>
+  lockedAssignments: Map<string, string>,
+  lockedGiverIds: string[] = []
 ): { assignments: Map<string, string>; attempts: number } {
   if (unlockedParticipantIds.length < MIN_PARTICIPANTS_FOR_REGENERATION) {
     throw new Error(
@@ -262,31 +350,37 @@ export function generatePartialAssignments(
     );
   }
 
-  // Get the set of participants who are already receiving from locked givers
+  // Participants already receiving from locked givers - cannot receive again
   const lockedReceivers = new Set(lockedAssignments.values());
 
-  // Find unlocked participants who are NOT receiving from a locked giver
-  // These are the only ones whose incoming assignment can change
-  const fullyUnlocked = unlockedParticipantIds.filter(id => !lockedReceivers.has(id));
+  // Available receivers for unlocked givers:
+  // 1. Locked givers who are NOT already receiving from another locked giver
+  // 2. Unlocked participants who are NOT already receiving from locked givers
+  //
+  // Key insight: A locked giver might be the target of another locked giver
+  // (e.g., L1→L2 where both L1 and L2 are locked). In that case, L2 is already
+  // receiving and cannot receive again.
+  const availableReceivers = [
+    ...lockedGiverIds.filter(id => !lockedReceivers.has(id)), // Locked givers not already receiving
+    ...unlockedParticipantIds.filter(id => !lockedReceivers.has(id)),
+  ];
 
-  // Also include unlocked participants who ARE receiving from locked givers
-  // But they can only give to other unlocked participants
-  const allUnlocked = [...unlockedParticipantIds];
+  // Givers are all unlocked participants
+  const givers = [...unlockedParticipantIds];
 
-  if (fullyUnlocked.length < 2) {
+  // Verify we have matching counts (this should always be true if logic is correct)
+  if (givers.length !== availableReceivers.length) {
     throw new Error(
-      `Not enough participants available for reassignment. ` +
-      `${lockedReceivers.size} participants are locked as receivers.`
+      `Assignment impossible: ${givers.length} unlocked givers but ${availableReceivers.length} available receivers. ` +
+      `This may indicate too many participants have viewed their assignments.`
     );
   }
 
   const allErrors: string[][] = [];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    // Generate a derangement among unlocked participants
-    // They will only give to each other
-    const newAssignments = generateDerangement(allUnlocked);
-    const validation = validatePartialAssignments(allUnlocked, newAssignments);
+    const newAssignments = generateBipartiteAssignment(givers, availableReceivers);
+    const validation = validateBipartiteAssignments(givers, availableReceivers, newAssignments);
 
     if (validation.valid) {
       return { assignments: newAssignments, attempts: attempt };

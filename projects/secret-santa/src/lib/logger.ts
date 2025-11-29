@@ -1,8 +1,3 @@
-import fs from "fs";
-import path from "path";
-
-const LOG_FILE = path.join(process.cwd(), "error.log");
-
 interface LogEntry {
   timestamp: string;
   level: "error" | "warn" | "info";
@@ -11,30 +6,63 @@ interface LogEntry {
   stack?: string;
 }
 
+/**
+ * Format log entry as JSON for structured logging
+ * This format works well with Vercel's log aggregation
+ */
 function formatLogEntry(entry: LogEntry): string {
-  const lines = [
-    `[${entry.timestamp}] ${entry.level.toUpperCase()}: ${entry.message}`,
-  ];
-
-  if (entry.context && Object.keys(entry.context).length > 0) {
-    lines.push(`  Context: ${JSON.stringify(entry.context)}`);
-  }
-
-  if (entry.stack) {
-    lines.push(`  Stack: ${entry.stack}`);
-  }
-
-  return lines.join("\n") + "\n";
+  return JSON.stringify({
+    timestamp: entry.timestamp,
+    level: entry.level,
+    message: entry.message,
+    ...(entry.context && { context: entry.context }),
+    ...(entry.stack && { stack: entry.stack }),
+  });
 }
 
-function writeToLog(entry: LogEntry): void {
-  try {
+/**
+ * Write log entry to console
+ * Uses structured JSON format for production (Vercel-friendly)
+ * Uses human-readable format for development
+ */
+function writeLog(entry: LogEntry): void {
+  const isDev = process.env.NODE_ENV === "development";
+
+  if (isDev) {
+    // Human-readable format for development
+    const lines = [
+      `[${entry.timestamp}] ${entry.level.toUpperCase()}: ${entry.message}`,
+    ];
+    if (entry.context && Object.keys(entry.context).length > 0) {
+      lines.push(`  Context: ${JSON.stringify(entry.context)}`);
+    }
+    if (entry.stack) {
+      lines.push(`  Stack: ${entry.stack}`);
+    }
+
+    switch (entry.level) {
+      case "error":
+        console.error(lines.join("\n"));
+        break;
+      case "warn":
+        console.warn(lines.join("\n"));
+        break;
+      default:
+        console.log(lines.join("\n"));
+    }
+  } else {
+    // Structured JSON for production (Vercel logs)
     const formatted = formatLogEntry(entry);
-    fs.appendFileSync(LOG_FILE, formatted);
-  } catch (err) {
-    // Fallback to console if file write fails
-    console.error("Failed to write to log file:", err);
-    console.error(entry);
+    switch (entry.level) {
+      case "error":
+        console.error(formatted);
+        break;
+      case "warn":
+        console.warn(formatted);
+        break;
+      default:
+        console.log(formatted);
+    }
   }
 }
 
@@ -57,12 +85,7 @@ export function logError(
     entry.context = { ...entry.context, error: String(error) };
   }
 
-  writeToLog(entry);
-
-  // Also log to console in development
-  if (process.env.NODE_ENV !== "production") {
-    console.error(`[ERROR] ${message}`, error, context);
-  }
+  writeLog(entry);
 }
 
 export function logWarn(
@@ -76,11 +99,7 @@ export function logWarn(
     context,
   };
 
-  writeToLog(entry);
-
-  if (process.env.NODE_ENV !== "production") {
-    console.warn(`[WARN] ${message}`, context);
-  }
+  writeLog(entry);
 }
 
 export function logInfo(
@@ -94,5 +113,5 @@ export function logInfo(
     context,
   };
 
-  writeToLog(entry);
+  writeLog(entry);
 }

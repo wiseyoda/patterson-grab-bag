@@ -123,7 +123,6 @@ export default function AdminPage() {
   const [confirmStep, setConfirmStep] = useState(1);
 
   // Regeneration status state
-  const [_regenStatus, setRegenStatus] = useState<RegenerationStatus | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
 
   // Edit event details state
@@ -328,7 +327,6 @@ export default function AdminPage() {
         throw new Error("Failed to check regeneration status");
       }
       const status: RegenerationStatus = await response.json();
-      setRegenStatus(status);
 
       // If can't regenerate, show error message
       if (!status.canRegenerate) {
@@ -482,7 +480,7 @@ export default function AdminPage() {
   function confirmSendAllEmails() {
     showConfirmModal(
       "Send All Emails",
-      "This will send invitation emails to all participants who have an email address and haven't been notified yet.",
+      "This will send invitation emails to all participants who have an email address and haven't viewed their assignment yet.",
       "Send Emails",
       async () => {
         setActionLoading("notify");

@@ -21,7 +21,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         participants: {
           where: {
             email: { not: null },
-            notificationStatus: "NOT_SENT",
+            // Send to anyone who hasn't viewed their assignment yet
+            notificationStatus: { not: "VIEWED" },
           },
         },
         gmailCredential: true,
