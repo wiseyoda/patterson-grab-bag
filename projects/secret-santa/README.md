@@ -30,7 +30,9 @@ Next.js 16 app for running Secret Santa (grab bag) exchanges with GUID-based adm
 1. Copy `.env.example` to `.env.local` and fill `DATABASE_URL`, `DIRECT_URL`, `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`. With Vercel, you can keep envs in the dashboard and pull them locally with `vercel env pull .env.local`.
 2. Install deps: `make setup`.
 3. Verify DB connectivity (requires valid env): `make db-check`.
-4. Start dev server: `make run` (http://localhost:3000).
+4. Apply migrations to your DB: `make db-migrate` (or `make db-migrate-dev` to create new migrations during development).
+5. Seed sample data (optional): `make db-seed`.
+6. Start dev server: `make run` (http://localhost:3000).
 
 ## Commands
 - `make fmt` — Prettier (with Tailwind plugin)
@@ -38,6 +40,9 @@ Next.js 16 app for running Secret Santa (grab bag) exchanges with GUID-based adm
 - `make test` — Jest suite
 - `make run` — Next dev server
 - `make db-check` — Quick database connectivity probe
+- `make db-migrate` — Apply existing Prisma migrations (deploy)
+- `make db-migrate-dev` — Create/apply a new migration in dev (`MIGRATION_NAME=my-change make db-migrate-dev`)
+- `make db-seed` — Seed sample data
 - `make build` — `npm run build` (if you need production output)
 
 Additional docs live in `docs/`; start with `docs/SPECS.md` for the product overview.
