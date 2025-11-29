@@ -1,6 +1,9 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const EMAIL_DISABLED_ERROR =
+  "Email service is not configured. Set RESEND_API_KEY to enable email sending.";
 
 interface SendAdminLinkEmailParams {
   to: string;
@@ -13,8 +16,13 @@ export async function sendAdminLinkEmail({
   eventName,
   adminLink,
 }: SendAdminLinkEmailParams): Promise<{ success: boolean; error?: string }> {
+  const client = resend;
+  if (!client) {
+    return { success: false, error: EMAIL_DISABLED_ERROR };
+  }
+
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await client.emails.send({
       from: "Secret Santa <onboarding@resend.dev>",
       to,
       subject: `Your Admin Link for ${eventName}`,
@@ -93,6 +101,11 @@ export async function sendInviteEmail({
   budget,
   revealLink,
 }: SendInviteEmailParams): Promise<{ success: boolean; error?: string }> {
+  const client = resend;
+  if (!client) {
+    return { success: false, error: EMAIL_DISABLED_ERROR };
+  }
+
   try {
     const formattedDate = eventDate
       ? new Date(eventDate + "T12:00:00").toLocaleDateString("en-US", {
@@ -103,7 +116,7 @@ export async function sendInviteEmail({
         })
       : null;
 
-    const { error } = await resend.emails.send({
+    const { error } = await client.emails.send({
       from: "Secret Santa <onboarding@resend.dev>",
       to,
       subject: `You've been invited to ${eventName}!`,
