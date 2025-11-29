@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NotificationStatus values: NOT_SENT, SENT, VIEWED (stored as String for SQLite compatibility)
+
+model Event {
+  id          String   @id @default(uuid())
+  name        String
+  adminToken  String   @unique @default(uuid())
+  budget      String?
+  eventDate   String?  // Stored as YYYY-MM-DD string to avoid timezone issues
+  rules       String?
+  isLocked    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  participants Participant[]
+}
+
+model Participant {
+  id                 String             @id @default(uuid())
+  eventId            String
+  name               String
+  email              String?
+  accessToken        String             @unique @default(uuid())
+  assignedToId       String?            @unique
+  notificationStatus String @default("NOT_SENT")
+  notifiedAt         DateTime?
+  viewedAt           DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  event      Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assignedTo Participant? @relation("Assignment", fields: [assignedToId], references: [id])
+  assignedBy Participant? @relation("Assignment")
+
+  @@index([eventId])
+  @@index([accessToken])
+}
