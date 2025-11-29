@@ -15,19 +15,41 @@ function getOptionalEnvVar(key: string, defaultValue: string): string {
   return process.env[key] || defaultValue;
 }
 
+function getDatabaseUrl(): string {
+  return (
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL ||
+    ""
+  );
+}
+
+function getDirectUrl(): string {
+  return (
+    process.env.DIRECT_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.POSTGRES_PRISMA_URL_NON_POOLING ||
+    ""
+  );
+}
+
 /**
  * Server-side environment variables
  * These should only be accessed in server components or API routes
  */
 export const serverEnv = {
   get DATABASE_URL() {
-    return getRequiredEnvVar("DATABASE_URL");
+    const url = getDatabaseUrl();
+    if (!url) {
+      throw new Error("Missing required environment variable: DATABASE_URL (or POSTGRES_PRISMA_URL/POSTGRES_URL)");
+    }
+    return url;
   },
   get DIRECT_URL() {
-    return getOptionalEnvVar("DIRECT_URL", "");
+    return getDirectUrl();
   },
   get RESEND_API_KEY() {
-    return getRequiredEnvVar("RESEND_API_KEY");
+    return getOptionalEnvVar("RESEND_API_KEY", "");
   },
 } as const;
 
@@ -47,13 +69,19 @@ export const clientEnv = {
  */
 export function validateEnv(): void {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   // Check required server env vars
-  if (!process.env.DATABASE_URL) {
-    errors.push("DATABASE_URL is required");
+  if (!getDatabaseUrl()) {
+    errors.push("DATABASE_URL (or POSTGRES_PRISMA_URL/POSTGRES_URL) is required");
   }
+
+  if (!getDirectUrl()) {
+    warnings.push("DIRECT_URL (or POSTGRES_URL_NON_POOLING/POSTGRES_PRISMA_URL_NON_POOLING) is recommended for Prisma migrations");
+  }
+
   if (!process.env.RESEND_API_KEY) {
-    errors.push("RESEND_API_KEY is required");
+    warnings.push("RESEND_API_KEY is missing; email sending will be disabled");
   }
 
   if (errors.length > 0) {
@@ -63,5 +91,10 @@ export function validateEnv(): void {
     if (process.env.NODE_ENV === "development") {
       throw new Error(`Environment validation failed: ${errors.join(", ")}`);
     }
+  }
+
+  if (warnings.length > 0) {
+    console.warn("Environment warnings:");
+    warnings.forEach((w) => console.warn(`  - ${w}`));
   }
 }

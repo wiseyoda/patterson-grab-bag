@@ -19,3 +19,6 @@ run:
 
 build:
 	npm run build
+
+db-check:
+	npm run db:check

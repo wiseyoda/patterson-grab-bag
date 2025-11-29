@@ -27,15 +27,17 @@ Next.js 16 app for running Secret Santa (grab bag) exchanges with GUID-based adm
 - Resend API key (for emails)
 
 ## Setup
-1. Copy `.env.example` to `.env` and fill `DATABASE_URL`, `DIRECT_URL`, `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`.
+1. Copy `.env.example` to `.env.local` and fill `DATABASE_URL`, `DIRECT_URL`, `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`. With Vercel, you can keep envs in the dashboard and pull them locally with `vercel env pull .env.local`.
 2. Install deps: `make setup`.
-3. Start dev server: `make run` (http://localhost:3000).
+3. Verify DB connectivity (requires valid env): `make db-check`.
+4. Start dev server: `make run` (http://localhost:3000).
 
 ## Commands
 - `make fmt` — Prettier (with Tailwind plugin)
 - `make lint` — ESLint
 - `make test` — Jest suite
 - `make run` — Next dev server
+- `make db-check` — Quick database connectivity probe
 - `make build` — `npm run build` (if you need production output)
 
 Additional docs live in `docs/`; start with `docs/SPECS.md` for the product overview.

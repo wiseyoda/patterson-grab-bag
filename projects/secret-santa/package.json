@@ -8,6 +8,7 @@
     "build": "npm run prisma:generate && next build",
     "vercel-build": "npm run build",
     "start": "next start",
+    "db:check": "node scripts/db-check.js",
     "lint": "eslint .",
     "fmt": "prettier --write .",
     "test": "jest",
