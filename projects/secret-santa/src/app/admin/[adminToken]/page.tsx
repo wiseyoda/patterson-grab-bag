@@ -800,6 +800,18 @@ export default function AdminPage() {
         </Card>
       )}
 
+      {/* Gmail Connection - Required for sending emails */}
+      <GmailConnectionCard
+        adminToken={adminToken}
+        onStatusChange={() => {
+          // Re-fetch Gmail status after connect/disconnect
+          fetch(`/api/admin/${adminToken}/gmail/status`)
+            .then((r) => r.json())
+            .then((data) => setGmailConnected(data.connected && !data.expired))
+            .catch(() => setGmailConnected(false));
+        }}
+      />
+
       {/* Admin Link Warning */}
       <Card className="mb-6 border-yellow-300 bg-yellow-50">
         <CardContent className="pt-6">
@@ -826,18 +838,6 @@ export default function AdminPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Gmail Connection */}
-      <GmailConnectionCard
-        adminToken={adminToken}
-        onStatusChange={() => {
-          // Re-fetch Gmail status after connect/disconnect
-          fetch(`/api/admin/${adminToken}/gmail/status`)
-            .then((r) => r.json())
-            .then((data) => setGmailConnected(data.connected && !data.expired))
-            .catch(() => setGmailConnected(false));
-        }}
-      />
 
       {/* Email Admin Link Modal */}
       <Dialog open={emailModalOpen} onOpenChange={setEmailModalOpen}>

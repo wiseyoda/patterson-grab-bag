@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const state = searchParams.get("state");
   const error = searchParams.get("error");
+  const grantedScopes = searchParams.get("scope");
 
   // Handle user denial
   if (error) {
@@ -23,6 +24,17 @@ export async function GET(request: NextRequest) {
   // Validate required parameters
   if (!code || !state) {
     return redirectToAdmin(null, "Missing OAuth parameters");
+  }
+
+  // Validate that gmail.send scope was granted
+  if (!grantedScopes || !grantedScopes.includes("gmail.send")) {
+    logError("Gmail scope not granted", new Error("Missing gmail.send scope"), {
+      grantedScopes,
+    });
+    return redirectToAdmin(
+      null,
+      "Gmail send permission was not granted. Please ensure you check all permission boxes during authorization."
+    );
   }
 
   try {

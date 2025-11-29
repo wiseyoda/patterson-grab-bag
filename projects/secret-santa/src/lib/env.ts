@@ -37,9 +37,6 @@ export const serverEnv = {
   get DIRECT_URL() {
     return getDirectUrl();
   },
-  get RESEND_API_KEY() {
-    return getOptionalEnvVar("RESEND_API_KEY", "");
-  },
 } as const;
 
 /**
@@ -67,10 +64,6 @@ export function validateEnv(): void {
 
   if (!getDirectUrl()) {
     warnings.push("DIRECT_URL (or POSTGRES_URL_NON_POOLING/POSTGRES_PRISMA_URL_NON_POOLING) is recommended for Prisma migrations");
-  }
-
-  if (!process.env.RESEND_API_KEY) {
-    warnings.push("RESEND_API_KEY is missing; email sending will be disabled");
   }
 
   if (errors.length > 0) {
