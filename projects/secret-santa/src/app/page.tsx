@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-const DEFAULT_RULES = `1. Each person draws one name and buys a gift for that person only.
-2. Keep your assigned person a secret until the gift exchange!
-3. Set a budget and stick to it - it's about the thought, not the price.
-4. Include a gift receipt in case of exchanges.
-5. Have fun and be creative with your gift selection!`;
+const DEFAULT_RULES = `🎅 1. One Name, One Gift: You have one mission. Buy one gift. Don't overcomplicate it.
+🤫 2. Shhh! It's a Secret: If you spill the beans, you're on the Naughty List. Forever.
+💰 3. Respect the Budget: Stick to the limit. We love you, but not *that* much.
+🧾 4. Receipts Required: Just in case they already have a singing fish.
+🎁 5. Have Fun: Get creative! But remember, we have to look you in the eye next year.`;
 
 export default function Home() {
   const router = useRouter();
