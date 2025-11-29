@@ -47,7 +47,7 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  url       = env("PRISMA_DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -231,7 +231,7 @@ npx prisma db push
 
 ```env
 # Database (Vercel Postgres)
-DATABASE_URL="postgres://..."
+PRISMA_DATABASE_URL="postgres://..."
 DIRECT_URL="postgres://..."
 
 # Email (Resend)

@@ -4,7 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("PRISMA_DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // NotificationStatus values: NOT_SENT, SENT, VIEWED (stored as String for SQLite compatibility)
@@ -20,7 +21,44 @@ model Event {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  participants Participant[]
+  participants    Participant[]
+  gmailCredential GmailCredential?
+}
+
+// Gmail OAuth credentials - encrypted tokens for per-event Gmail sending
+model GmailCredential {
+  id                    String    @id @default(uuid())
+  eventId               String    @unique
+  encryptedAccessToken  String    // AES-256-GCM encrypted
+  encryptedRefreshToken String    // AES-256-GCM encrypted
+  tokenIV               String    // Initialization vector for access token
+  tokenAuthTag          String    // Authentication tag for access token
+  refreshTokenIV        String    // Initialization vector for refresh token
+  refreshTokenAuthTag   String    // Authentication tag for refresh token
+  gmailAddress          String    // Display email address
+  tokenExpiresAt        DateTime
+  connectedAt           DateTime  @default(now())
+  revokedAt             DateTime? // Soft-delete for disconnect
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+// OAuth state for CSRF protection and PKCE flow
+model OAuthState {
+  id           String    @id @default(uuid())
+  state        String    @unique // Cryptographically random state parameter
+  eventId      String
+  adminToken   String    // Verify the requester is the admin
+  codeVerifier String    // PKCE code verifier (encrypted)
+  verifierIV   String    // IV for code verifier encryption
+  verifierAuthTag String // Auth tag for code verifier encryption
+  expiresAt    DateTime  // 10 minute expiry
+  usedAt       DateTime? // Mark as used to prevent replay
+
+  @@index([state])
+  @@index([expiresAt])
 }
 
 model Participant {

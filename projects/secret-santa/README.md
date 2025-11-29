@@ -27,7 +27,7 @@ Next.js 16 app for running Secret Santa (grab bag) exchanges with GUID-based adm
 - Resend API key (for emails)
 
 ## Setup
-1. Copy `.env.example` to `.env.local` and fill `DATABASE_URL`, `DIRECT_URL`, `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`. With Vercel, you can keep envs in the dashboard and pull them locally with `vercel env pull .env.local`.
+1. Copy `.env.example` to `.env.local` and fill `PRISMA_DATABASE_URL`, `DIRECT_URL`, `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`. With Vercel, you can keep envs in the dashboard and pull them locally with `vercel env pull .env.local`.
 2. Install deps: `make setup`.
 3. Verify DB connectivity (requires valid env): `make db-check`.
 4. Apply migrations to your DB: `make db-migrate` (or `make db-migrate-dev` to create new migrations during development).
@@ -44,5 +44,9 @@ Next.js 16 app for running Secret Santa (grab bag) exchanges with GUID-based adm
 - `make db-migrate-dev` — Create/apply a new migration in dev (`MIGRATION_NAME=my-change make db-migrate-dev`)
 - `make db-seed` — Seed sample data
 - `make build` — `npm run build` (if you need production output)
+
+Environment notes
+- Runtime picks up `PRISMA_DATABASE_URL` (or `PRISMA_ACCELERATE_URL`/Vercel `POSTGRES_*` vars). For migrations, set `DIRECT_URL` (non-pooling Postgres URL, e.g., `POSTGRES_URL_NON_POOLING`).
+- Keep secrets out of git; use Vercel envs and pull them locally with `vercel env pull`.
 
 Additional docs live in `docs/`; start with `docs/SPECS.md` for the product overview.

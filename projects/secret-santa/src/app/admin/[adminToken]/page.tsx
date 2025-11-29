@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { GmailConnectionCard } from "@/components/GmailConnectionCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,7 @@ interface RegenerationStatus {
 export default function AdminPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const adminToken = params.adminToken as string;
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -68,6 +70,9 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Gmail connection status
+  const [gmailConnected, setGmailConnected] = useState(false);
 
   // Form state for adding participants
   const [newName, setNewName] = useState("");
@@ -138,6 +143,38 @@ export default function AdminPage() {
   useEffect(() => {
     fetchEvent();
   }, [fetchEvent]);
+
+  // Handle OAuth return params and fetch Gmail status
+  useEffect(() => {
+    // Check for Gmail OAuth return params
+    const gmailConnectedParam = searchParams.get("gmail_connected");
+    const gmailError = searchParams.get("gmail_error");
+
+    if (gmailConnectedParam === "true") {
+      setSuccessMessage("Gmail connected successfully!");
+      setGmailConnected(true);
+      // Clean up URL params
+      router.replace(`/admin/${adminToken}`, { scroll: false });
+    } else if (gmailError) {
+      setError(gmailError);
+      // Clean up URL params
+      router.replace(`/admin/${adminToken}`, { scroll: false });
+    }
+
+    // Fetch Gmail status
+    async function fetchGmailStatus() {
+      try {
+        const response = await fetch(`/api/admin/${adminToken}/gmail/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setGmailConnected(data.connected && !data.expired);
+        }
+      } catch {
+        // Silently fail - user can still try to connect
+      }
+    }
+    fetchGmailStatus();
+  }, [searchParams, adminToken, router]);
 
   async function addParticipant(e: React.FormEvent) {
     e.preventDefault();
@@ -790,6 +827,18 @@ export default function AdminPage() {
         </CardContent>
       </Card>
 
+      {/* Gmail Connection */}
+      <GmailConnectionCard
+        adminToken={adminToken}
+        onStatusChange={() => {
+          // Re-fetch Gmail status after connect/disconnect
+          fetch(`/api/admin/${adminToken}/gmail/status`)
+            .then((r) => r.json())
+            .then((data) => setGmailConnected(data.connected && !data.expired))
+            .catch(() => setGmailConnected(false));
+        }}
+      />
+
       {/* Email Admin Link Modal */}
       <Dialog open={emailModalOpen} onOpenChange={setEmailModalOpen}>
         <DialogContent>
@@ -976,7 +1025,7 @@ export default function AdminPage() {
                 <Button
                   type="button"
                   onClick={confirmSendAllEmails}
-                  disabled={actionLoading === "notify"}
+                  disabled={actionLoading === "notify" || !gmailConnected}
                 >
                   {actionLoading === "notify" ? "Sending..." : "Send All Emails"}
                 </Button>
@@ -996,7 +1045,12 @@ export default function AdminPage() {
               Need at least 3 participants to generate assignments
             </p>
           )}
-          {event.isLocked && (
+          {event.isLocked && !gmailConnected && (
+            <p className="text-sm text-amber-600 mt-2">
+              Connect your Gmail account above to send invitation emails.
+            </p>
+          )}
+          {event.isLocked && gmailConnected && (
             <p className="text-sm text-gray-500 mt-2">
               You can regenerate assignments for participants who haven&apos;t viewed their assignment yet.
             </p>

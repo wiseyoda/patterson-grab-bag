@@ -4,6 +4,8 @@ function getOptionalEnvVar(key: string, defaultValue: string): string {
 
 function getDatabaseUrl(): string {
   return (
+    process.env.PRISMA_DATABASE_URL ||
+    process.env.PRISMA_ACCELERATE_URL ||
     process.env.DATABASE_URL ||
     process.env.POSTGRES_PRISMA_URL ||
     process.env.POSTGRES_URL ||
@@ -25,10 +27,10 @@ function getDirectUrl(): string {
  * These should only be accessed in server components or API routes
  */
 export const serverEnv = {
-  get DATABASE_URL() {
+  get PRISMA_DATABASE_URL() {
     const url = getDatabaseUrl();
     if (!url) {
-      throw new Error("Missing required environment variable: DATABASE_URL (or POSTGRES_PRISMA_URL/POSTGRES_URL)");
+      throw new Error("Missing required environment variable: PRISMA_DATABASE_URL (or PRISMA_ACCELERATE_URL/POSTGRES_PRISMA_URL/POSTGRES_URL)");
     }
     return url;
   },
@@ -60,7 +62,7 @@ export function validateEnv(): void {
 
   // Check required server env vars
   if (!getDatabaseUrl()) {
-    errors.push("DATABASE_URL (or POSTGRES_PRISMA_URL/POSTGRES_URL) is required");
+    errors.push("PRISMA_DATABASE_URL (or PRISMA_ACCELERATE_URL/POSTGRES_PRISMA_URL/POSTGRES_URL) is required");
   }
 
   if (!getDirectUrl()) {

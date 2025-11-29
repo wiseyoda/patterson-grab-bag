@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { sendInviteEmail } from "@/lib/email";
+import {
+  sendInviteEmailViaGmail,
+  GmailNotConnectedError,
+  GmailTokenRevokedError,
+} from "@/lib/gmail-send";
 import { logError } from "@/lib/logger";
 
 interface RouteParams {
@@ -20,6 +24,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             notificationStatus: "NOT_SENT",
           },
         },
+        gmailCredential: true,
       },
     });
 
@@ -34,6 +39,17 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // Check if Gmail is connected
+    if (!event.gmailCredential || event.gmailCredential.revokedAt) {
+      return NextResponse.json(
+        {
+          error:
+            "Gmail is not connected. Please connect your Gmail account to send emails.",
+        },
+        { status: 400 }
+      );
+    }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const results: { name: string; success: boolean; error?: string }[] = [];
 
@@ -42,30 +58,53 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
       const revealLink = `${appUrl}/reveal/${participant.accessToken}`;
 
-      const result = await sendInviteEmail({
-        to: participant.email,
-        participantName: participant.name,
-        eventName: event.name,
-        eventDate: event.eventDate,
-        budget: event.budget,
-        revealLink,
-      });
+      try {
+        const result = await sendInviteEmailViaGmail(
+          event.id,
+          participant.email,
+          participant.name,
+          event.name,
+          revealLink,
+          event.eventDate,
+          event.budget
+        );
 
-      if (result.success) {
-        await prisma.participant.update({
-          where: { id: participant.id },
-          data: {
-            notificationStatus: "SENT",
-            notifiedAt: new Date(),
-          },
+        if (result.success) {
+          await prisma.participant.update({
+            where: { id: participant.id },
+            data: {
+              notificationStatus: "SENT",
+              notifiedAt: new Date(),
+            },
+          });
+        }
+
+        results.push({
+          name: participant.name,
+          success: result.success,
+          error: result.error,
+        });
+      } catch (error) {
+        // Handle Gmail-specific errors
+        if (error instanceof GmailNotConnectedError) {
+          return NextResponse.json(
+            { error: "Gmail is not connected. Please reconnect your Gmail account." },
+            { status: 400 }
+          );
+        }
+        if (error instanceof GmailTokenRevokedError) {
+          return NextResponse.json(
+            { error: "Gmail access was revoked. Please reconnect your Gmail account." },
+            { status: 400 }
+          );
+        }
+
+        results.push({
+          name: participant.name,
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
-
-      results.push({
-        name: participant.name,
-        success: result.success,
-        error: result.error,
-      });
     }
 
     const successCount = results.filter((r) => r.success).length;
@@ -78,7 +117,23 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       results,
     });
   } catch (error) {
-    logError("Error sending notifications", error, { endpoint: "POST /api/admin/[adminToken]/notify" });
+    // Handle Gmail-specific errors at the top level too
+    if (error instanceof GmailNotConnectedError) {
+      return NextResponse.json(
+        { error: "Gmail is not connected. Please connect your Gmail account." },
+        { status: 400 }
+      );
+    }
+    if (error instanceof GmailTokenRevokedError) {
+      return NextResponse.json(
+        { error: "Gmail access was revoked. Please reconnect your Gmail account." },
+        { status: 400 }
+      );
+    }
+
+    logError("Error sending notifications", error, {
+      endpoint: "POST /api/admin/[adminToken]/notify",
+    });
     return NextResponse.json(
       { error: "Failed to send notifications" },
       { status: 500 }
