@@ -1,16 +1,3 @@
-/**
- * Environment variable validation and access
- * Provides type-safe access to environment variables with validation
- */
-
-function getRequiredEnvVar(key: string): string {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return value;
-}
-
 function getOptionalEnvVar(key: string, defaultValue: string): string {
   return process.env[key] || defaultValue;
 }
