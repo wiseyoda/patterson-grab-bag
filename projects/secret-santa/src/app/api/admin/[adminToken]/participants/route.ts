@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { adminToken } = await params;
     const body = await request.json();
-    const { name, email } = body;
+    const { name, email, phone } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json(
@@ -37,6 +37,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    // Normalize phone number if provided
+    const trimmedPhone = phone?.trim() || null;
 
     const event = await prisma.event.findUnique({
       where: { adminToken },
@@ -58,6 +61,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         eventId: event.id,
         name: name.trim(),
         email: trimmedEmail || null,
+        phone: trimmedPhone,
       },
     });
 
@@ -65,6 +69,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       id: participant.id,
       name: participant.name,
       email: participant.email,
+      phone: participant.phone,
       accessToken: participant.accessToken,
       notificationStatus: participant.notificationStatus,
     });

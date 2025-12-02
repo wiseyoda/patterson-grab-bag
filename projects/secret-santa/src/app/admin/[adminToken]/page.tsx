@@ -38,6 +38,7 @@ interface Participant {
   id: string;
   name: string;
   email: string | null;
+  phone: string | null;
   accessToken: string;
   hasAssignment: boolean;
   notificationStatus: "NOT_SENT" | "SENT" | "VIEWED";
@@ -84,7 +85,12 @@ export default function AdminPage() {
 
   // Form state for adding participants
   const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
+
+  // Bulk import state
+  const [bulkData, setBulkData] = useState("");
+  const [bulkImportLoading, setBulkImportLoading] = useState(false);
 
   // Email admin link modal state
   const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -227,7 +233,11 @@ export default function AdminPage() {
       const response = await fetch(`/api/admin/${adminToken}/participants`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim(), email: newEmail.trim() || null }),
+        body: JSON.stringify({
+          name: newName.trim(),
+          phone: newPhone.trim() || null,
+          email: newEmail.trim() || null,
+        }),
       });
 
       if (!response.ok) {
@@ -236,12 +246,41 @@ export default function AdminPage() {
       }
 
       setNewName("");
+      setNewPhone("");
       setNewEmail("");
       fetchEvent();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to add participant");
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function bulkImportParticipants(e: React.FormEvent) {
+    e.preventDefault();
+    if (!bulkData.trim()) return;
+
+    setBulkImportLoading(true);
+    try {
+      const response = await fetch(`/api/admin/${adminToken}/participants/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: bulkData }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error);
+      }
+
+      const result = await response.json();
+      setBulkData("");
+      setSuccessMessage(`Successfully imported ${result.count} participants!`);
+      fetchEvent();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import participants");
+    } finally {
+      setBulkImportLoading(false);
     }
   }
 
@@ -959,43 +998,88 @@ ${url}`;
         </DialogContent>
       </Dialog>
 
-      {/* Add Participant Form */}
+      {/* Add Participants Section */}
       {!event.isLocked && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Add Participant</CardTitle>
-            <CardDescription>Add people to your gift exchange</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={addParticipant} className="flex gap-4 flex-wrap">
-              <div className="flex-1 min-w-[200px]">
-                <Label htmlFor="newName">Name *</Label>
-                <Input
-                  id="newName"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="John Doe"
-                  required
-                />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <Label htmlFor="newEmail">Email (optional)</Label>
-                <Input
-                  id="newEmail"
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="john@example.com"
-                />
-              </div>
-              <div className="flex items-end">
-                <Button type="submit" disabled={actionLoading === "add"}>
-                  {actionLoading === "add" ? "Adding..." : "Add"}
+        <>
+          {/* Bulk Import */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Bulk Import Participants</CardTitle>
+              <CardDescription>
+                Paste tab-separated data (Name, Phone, Email) - one person per line
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={bulkImportParticipants} className="space-y-4">
+                <div>
+                  <Textarea
+                    value={bulkData}
+                    onChange={(e) => setBulkData(e.target.value)}
+                    placeholder={`Name\tPhone\tE-mail
+Katie Patterson\t412-585-0139\tkatie@example.com
+Patrick Patterson\t412-956-0423\tpatrick@example.com
+Bill Wolfe\t412-302-6347\t`}
+                    rows={6}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Header row is optional. Phone and email columns are optional.
+                  </p>
+                </div>
+                <Button type="submit" disabled={bulkImportLoading || !bulkData.trim()}>
+                  {bulkImportLoading ? "Importing..." : "Import Participants"}
                 </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Add Single Participant */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Add Participant</CardTitle>
+              <CardDescription>Add a single person to your gift exchange</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={addParticipant} className="flex gap-4 flex-wrap">
+                <div className="flex-1 min-w-[150px]">
+                  <Label htmlFor="newName">Name *</Label>
+                  <Input
+                    id="newName"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="John Doe"
+                    required
+                  />
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                  <Label htmlFor="newPhone">Phone</Label>
+                  <Input
+                    id="newPhone"
+                    type="tel"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    placeholder="412-555-0123"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <Label htmlFor="newEmail">Email</Label>
+                  <Input
+                    id="newEmail"
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="john@example.com"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button type="submit" disabled={actionLoading === "add"}>
+                    {actionLoading === "add" ? "Adding..." : "Add"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Participants Table */}
@@ -1016,6 +1100,7 @@ ${url}`;
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Assigned</TableHead>
                   <TableHead>Notification</TableHead>
@@ -1026,6 +1111,7 @@ ${url}`;
                 {event.participants.map((participant) => (
                   <TableRow key={participant.id}>
                     <TableCell className="font-medium">{participant.name}</TableCell>
+                    <TableCell>{participant.phone || "-"}</TableCell>
                     <TableCell>{participant.email || "-"}</TableCell>
                     <TableCell>
                       {participant.hasAssignment ? (

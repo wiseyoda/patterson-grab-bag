@@ -18,6 +18,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
             id: true,
             name: true,
             email: true,
+            phone: true,
             accessToken: true,
             assignedToId: true, // We'll convert this to a boolean
             notificationStatus: true,
@@ -39,6 +40,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       id: p.id,
       name: p.name,
       email: p.email,
+      phone: p.phone,
       accessToken: p.accessToken,
       hasAssignment: p.assignedToId !== null,
       notificationStatus: p.notificationStatus,
